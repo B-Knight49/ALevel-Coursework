@@ -325,7 +325,7 @@ def __init__():
 
         else:
             DbCursor.execute('INSERT INTO Credentials (ID, Usernames, Hash, Code) values (?,?,?,?);',[nextID,username,password,security]).commit()
-            DbCursor.execute('INSERT INTO Permissions (Admin) values (0);').commit()
+            DbCursor.execute('INSERT INTO Permissions (ID, Admin) values (?,0);',[nextID]).commit()
             DbCursor.close()
         
             removeWidgets(signUpWindow)
@@ -1782,7 +1782,7 @@ Microsoft Access 2010
 
                     DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
                     DbCursor = DbConn.cursor()      
-                    DbCursor.execute("SELECT Usernames FROM Credentials;")
+                    DbCursor.execute("SELECT Usernames FROM Credentials, Permissions;")
 
                     usernameList = []
                     while True:
@@ -1818,7 +1818,7 @@ Microsoft Access 2010
                         global removeLabel
                         global notAdmin
                         selectedUser = varOptions.get()
-                        DbCursor.execute("SELECT Usernames, Admin FROM Credentials;")
+                        DbCursor.execute("SELECT Usernames, Admin FROM Credentials, Permissions;")
 
                         while True:
                             adminCheck = DbCursor.fetchone()
@@ -1902,7 +1902,7 @@ Microsoft Access 2010
                                         print()
                                     madeAdmin = Label(permissionWindow,text="Added user to Admin",font=("Helvetica",10),fg='green',bg='black')
                                     madeAdmin.place(x=120,y=120)
-                                    DbCursor.execute("UPDATE Credentials SET Admin = 1 WHERE StrComp([Usernames],(?),0) = 0;",[selectedUser]).commit()
+                                    DbCursor.execute("UPDATE Permissions SET Admin = 1 WHERE StrComp([Usernames],(?),0) = 0;",[selectedUser]).commit()
                             except:
                                 print("Not a correct username!")
                                 try:
@@ -1940,7 +1940,7 @@ Microsoft Access 2010
                         global removeLabel
                         global notAdmin
                         selectedUser = varOptions.get()
-                        DbCursor.execute("SELECT Usernames, Admin FROM Credentials;")
+                        DbCursor.execute("SELECT ID, Usernames, Admin FROM Credentials, Permissions;")
 
                         while True:
                             adminCheck = DbCursor.fetchone()
@@ -2024,7 +2024,7 @@ Microsoft Access 2010
                                         print()
                                     removeLabel = Label(permissionWindow,text="Removed user from Admin",font=("Helvetica",10),fg='green',bg='black')
                                     removeLabel.place(x=100,y=120)
-                                    DbCursor.execute("UPDATE Credentials SET Admin = 0 WHERE StrComp([Usernames],(?),0) = 0;",[selectedUser]).commit()
+                                    DbCursor.execute("SELECT ID WHERE StrComp([Usernames]) FROM Credentials;",[selectedUser]).commit()
                             except:
                                 print("Not a correct username")
                                 try:
@@ -2505,7 +2505,7 @@ Microsoft Access 2010
                     # Enable the admin actions for certain users
                     DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
                     DbCursor = DbConn.cursor()      
-                    DbCursor.execute("SELECT Usernames, Admin FROM Credentials;")
+                    DbCursor.execute("SELECT Usernames, Admin FROM Credentials, Permissions;")
                 except:
                     print("Database doesn't exist error")
                     adminCheck = 0
