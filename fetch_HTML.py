@@ -220,6 +220,12 @@ def fFetchHTML():
     IntelRank = (99999)
     tableCode.append(IntelHD)
     tableCode.append(IntelRank)
+
+    # Add Mirage Driver to the database
+    MirageD = ("Mirage Driver")
+    MirageR = (999999)
+    tableCode.append(MirageD)
+    tableCode.append(MirageR)
     
     fileGPU_NEW.write(str(tableCode))
     print("Formatting complete")

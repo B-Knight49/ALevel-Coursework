@@ -65,11 +65,10 @@ def __init__():
             print("Configuring Tables...")
             DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
             DbCursor = DbConn.cursor()
-            # Creating the two different tables and creating a relationship between them using CONSTRAINTS and keys
-            DbCursor.execute('CREATE TABLE Credentials (ID INTEGER CONSTRAINT PK_ID PRIMARY KEY, Usernames CHAR(32), Hash CHAR(64), Code INTEGER);').commit()
+            DbCursor.execute('CREATE TABLE Credentials (ID INTEGER PRIMARY KEY, Usernames CHAR(32), Hash CHAR(64), Code INTEGER, Admin INTEGER);').commit()
             print("Created Table Credentials\n")
-            DbCursor.execute('CREATE TABLE Permissions (ID INTEGER NOT NULL CONSTRAINT FK_ID REFERENCES Credentials (ID), Admin INTEGER);').commit()
-            print("Created Table Permissions\n")
+            DbCursor.execute('CREATE TABLE Hardware (ID INTEGER NOT NULL CONSTRAINT FK_ID REFERENCES Credentials (ID), CPU CHAR(128), GPU CHAR(128), RAM INTEGER, HDD INTEGER);').commit()
+            print("Created Table Hardware\n")
         except:
             raise
     
@@ -231,7 +230,8 @@ def __init__():
         if usernameEntry == "" or usernameEntry == "Username":
             print("Username box empty")
             return
-            
+        
+        # Getting the logged in user    
         DbCursor.execute("SELECT Usernames, Hash FROM Credentials WHERE Usernames = ?;",[usernameEntry,])
         
         while True:
@@ -324,8 +324,8 @@ def __init__():
             usernameTaken.place(x=205,y=350)
 
         else:
-            DbCursor.execute('INSERT INTO Credentials (ID, Usernames, Hash, Code) values (?,?,?,?);',[nextID,username,password,security]).commit()
-            DbCursor.execute('INSERT INTO Permissions (ID, Admin) values (?,0);',[nextID]).commit()
+            DbCursor.execute('INSERT INTO Credentials (ID, Usernames, Hash, Code, Admin) values (?,?,?,?,0);',[nextID,username,password,security]).commit()
+            DbCursor.execute('INSERT INTO Hardware (ID) values (?);',[nextID]).commit()
             DbCursor.close()
         
             removeWidgets(signUpWindow)
@@ -557,6 +557,7 @@ def __init__():
         global gifFrames
         global userWhitelist
         global overlayWindow
+        global userID
         
         # Make the Program Window (PW)
         pw = tk.Tk()
@@ -648,6 +649,20 @@ def __init__():
             return
             overlayWindow.mainloop()
 
+        # Getting the ID of the currently signed in user
+        DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
+        DbCursor = DbConn.cursor()
+        DbCursor.execute("SELECT ID, Usernames FROM Credentials;")
+        
+        while True:
+            rowUsername = DbCursor.fetchone()
+            if rowUsername:
+                if rowUsername[1] == currentUser:
+                    userID = rowUsername[0]
+                else:
+                    next
+            else:
+                break
 
         ##########################
         #    Retrieve Hardware   #
@@ -741,6 +756,14 @@ def __init__():
             uGPU = gpu_infoFinal.Name
             uRAM = system_ram
             uHDD = freeSpace
+
+            # Save user hardware to the database
+            DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
+            DbCursor = DbConn.cursor()
+            DbCursor.execute("UPDATE Hardware SET CPU = (?) WHERE ID = (?);",[uCPU,userID]).commit()
+            DbCursor.execute("UPDATE Hardware SET GPU = (?) WHERE ID = (?);",[uGPU,userID]).commit()
+            DbCursor.execute("UPDATE Hardware SET RAM = (?) WHERE ID = (?);",[uRAM,userID]).commit()
+            DbCursor.execute("UPDATE Hardware SET HDD = (?) WHERE ID = (?);",[uHDD,userID]).commit()
 
             return uCPU,uGPU,uRAM,uHDD,rCPU,rGPU,rRAM,rHDD
         
@@ -1782,7 +1805,7 @@ Microsoft Access 2010
 
                     DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
                     DbCursor = DbConn.cursor()      
-                    DbCursor.execute("SELECT Usernames FROM Credentials, Permissions;")
+                    DbCursor.execute("SELECT Usernames FROM Credentials;")
 
                     usernameList = []
                     while True:
@@ -1818,7 +1841,7 @@ Microsoft Access 2010
                         global removeLabel
                         global notAdmin
                         selectedUser = varOptions.get()
-                        DbCursor.execute("SELECT Usernames, Admin FROM Credentials, Permissions;")
+                        DbCursor.execute("SELECT Usernames, Admin FROM Credentials;")
 
                         while True:
                             adminCheck = DbCursor.fetchone()
@@ -1902,7 +1925,7 @@ Microsoft Access 2010
                                         print()
                                     madeAdmin = Label(permissionWindow,text="Added user to Admin",font=("Helvetica",10),fg='green',bg='black')
                                     madeAdmin.place(x=120,y=120)
-                                    DbCursor.execute("UPDATE Permissions SET Admin = 1 WHERE StrComp([Usernames],(?),0) = 0;",[selectedUser]).commit()
+                                    DbCursor.execute("UPDATE Credentials SET Admin = 1 WHERE StrComp([Usernames],(?),0) = 0;",[selectedUser]).commit()
                             except:
                                 print("Not a correct username!")
                                 try:
@@ -1940,7 +1963,7 @@ Microsoft Access 2010
                         global removeLabel
                         global notAdmin
                         selectedUser = varOptions.get()
-                        DbCursor.execute("SELECT ID, Usernames, Admin FROM Credentials, Permissions;")
+                        DbCursor.execute("SELECT Usernames, Admin FROM Credentials;")
 
                         while True:
                             adminCheck = DbCursor.fetchone()
@@ -2024,7 +2047,7 @@ Microsoft Access 2010
                                         print()
                                     removeLabel = Label(permissionWindow,text="Removed user from Admin",font=("Helvetica",10),fg='green',bg='black')
                                     removeLabel.place(x=100,y=120)
-                                    DbCursor.execute("SELECT ID WHERE StrComp([Usernames]) FROM Credentials;",[selectedUser]).commit()
+                                    DbCursor.execute("UPDATE Credentials SET Admin = 0 WHERE StrComp([Usernames],(?),0) = 0;",[selectedUser]).commit()
                             except:
                                 print("Not a correct username")
                                 try:
@@ -2500,12 +2523,13 @@ Microsoft Access 2010
 
                 resetDatabase.config(state=DISABLED)
                 adminUser.config(state=DISABLED)
+                tempRemove.config(state=DISABLED)
 
                 try:
                     # Enable the admin actions for certain users
                     DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
                     DbCursor = DbConn.cursor()      
-                    DbCursor.execute("SELECT Usernames, Admin FROM Credentials, Permissions;")
+                    DbCursor.execute("SELECT Usernames, Admin FROM Credentials;")
                 except:
                     print("Database doesn't exist error")
                     adminCheck = 0
@@ -2526,11 +2550,14 @@ Microsoft Access 2010
                 if adminCheck == 1:
                     resetDatabase.config(state=NORMAL)
                     adminUser.config(state=NORMAL)
+                    tempRemove.config(state=NORMAL)
                 else:
                     adminLabel = Label(master=otherCanvas,text="Admin Only",font=("Helvetica",10),fg='red',bg='#3d3d3d')
                     adminLabel.place(x=470,y=355)
                     adminLabel2 = Label(master=otherCanvas,text="Admin Only",font=("Helvetica",10),fg='red',bg='#3d3d3d')
                     adminLabel2.place(x=470,y=275)
+                    adminLabel3 = Label(master=otherCanvas,text="Admin Only",font=("Helvetica",10),fg='red',bg='#3d3d3d')
+                    adminLabel3.place(x=470,y=195)
             else:
                 print("already created window: OTHER")
                 print()
