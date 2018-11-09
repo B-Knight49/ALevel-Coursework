@@ -65,9 +65,11 @@ def __init__():
             print("Configuring Tables...")
             DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
             DbCursor = DbConn.cursor()
-            DbCursor.execute('CREATE TABLE Credentials (ID INTEGER PRIMARY KEY, Usernames CHAR(32), Hash CHAR(64), Code INTEGER, Admin INTEGER);').commit()
+            DbCursor.execute('CREATE TABLE Credentials (ID INTEGER PRIMARY KEY, Usernames CHAR(32), Hash CHAR(64), Code INTEGER);').commit()
             print("Created Table Credentials\n")
             DbCursor.execute('CREATE TABLE Hardware (ID INTEGER NOT NULL CONSTRAINT FK_ID REFERENCES Credentials (ID), CPU CHAR(128), GPU CHAR(128), RAM INTEGER, HDD INTEGER);').commit()
+            print("Created Table Hardware\n")
+            DbCursor.execute('CREATE TABLE Permissions (ID INTEGER NOT NULL CONSTRAINT Perms_ID REFERENCES Credentials (ID), Permissions INTEGER);').commit()
             print("Created Table Hardware\n")
         except:
             raise
@@ -324,8 +326,9 @@ def __init__():
             usernameTaken.place(x=205,y=350)
 
         else:
-            DbCursor.execute('INSERT INTO Credentials (ID, Usernames, Hash, Code, Admin) values (?,?,?,?,0);',[nextID,username,password,security]).commit()
+            DbCursor.execute('INSERT INTO Credentials (ID, Usernames, Hash, Code) values (?,?,?,?);',[nextID,username,password,security]).commit()
             DbCursor.execute('INSERT INTO Hardware (ID) values (?);',[nextID]).commit()
+            DbCursor.execute('INSERT INTO Permissions (ID, Permissions) values (?,0);',[nextID]).commit()
             DbCursor.close()
         
             removeWidgets(signUpWindow)
@@ -1793,6 +1796,7 @@ Microsoft Access 2010
                 def managePerms():
 
                     global permissionWindow
+                    global permsInfo
                     
                     permissionWindow = tk.Tk()
                     permissionWindow.geometry("350x150")
@@ -1804,9 +1808,13 @@ Microsoft Access 2010
                     permissionWindow.resizable(0,0)
 
                     DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
-                    DbCursor = DbConn.cursor()      
+                    DbCursor = DbConn.cursor()
                     DbCursor.execute("SELECT Usernames FROM Credentials;")
 
+                    # Main information label
+                    permsInfo = Label(permissionWindow,text="",bg='black',font=("Helvetica",10))
+                    permsInfo.place(x=100,y=120)
+                    
                     usernameList = []
                     while True:
                         username = DbCursor.fetchone()
@@ -1833,257 +1841,217 @@ Microsoft Access 2010
                     userOptions.place(x=110,y=20)
                     permissionWindow.withdraw()
                     permissionWindow.deiconify()
+                    
+                    def fremoveMod():
+                        
+                        global permsInfo
 
-                    def fmakeAdmin():
-                        global currentAdmin
-                        global notUser
-                        global madeAdmin
-                        global removeLabel
-                        global notAdmin
                         selectedUser = varOptions.get()
-                        DbCursor.execute("SELECT Usernames, Admin FROM Credentials;")
+                        DbCursor.execute("SELECT Usernames, ID FROM Credentials;")
 
+                        while True:
+                            userCheck = DbCursor.fetchone()
+                            if userCheck != None:
+                                if userCheck[0] == selectedUser:
+                                    userID = userCheck[1]
+                            else:
+                                break
+
+                        # Fixes error returned when userID = None
+                        try:
+                            DbCursor.execute("SELECT Permissions FROM Permissions WHERE ID = (?);",[userID])
+                        except:
+                            print("User doesn't exist")
+                            permsInfo.config(text="That is not a user!",fg='red')
+                            
+                        while True:
+                            modCheck = DbCursor.fetchone()
+                            if modCheck != None:
+                                modInt = modCheck[0]
+                            else:
+                                break
+                            
+                        if selectedUser != "--Select User--":
+                            try:
+                                if modInt == 0:
+                                    print("User not a Mod\n ")
+                                    permsInfo.config(text="User is not a Moderator!",fg='red')
+                                    
+                                elif modInt == None:
+                                    permsInfo.config(text="That is not a user!",fg='red')
+                                    print("Not a correct username\n")
+                                    
+                                else:
+                                    print("Removed user from Moderator\n")
+                                    permsInfo.config(text="Removed user from Moderator",fg='green')
+                                    DbCursor.execute("UPDATE Permissions SET Permissions = 0 WHERE ID = (?);",[userID]).commit()
+                            except:
+                                print("Not a correct username\n")
+                                permsInfo.config(text="That is not a user!",fg='red')
+                        else:
+                            print("That is not a user!\n")
+                            permsInfo.config(text="That is not a user!",fg='red')
+
+                    def fmakeMod():
+
+                        global permsInfo
+                        
+                        selectedUser = varOptions.get()
+                        DbCursor.execute("SELECT Usernames, ID FROM Credentials;")
+
+                        while True:
+                            userCheck = DbCursor.fetchone()
+                            if userCheck != None:
+                                if userCheck[0] == selectedUser:
+                                    userID = userCheck[1]
+                            else:
+                                break
+
+                        # Fixes error returned when userID = None
+                        try:
+                            DbCursor.execute("SELECT Permissions FROM Permissions WHERE ID = (?);",[userID])
+                        except:
+                            print("User doesn't exist")
+                            permsInfo.config(text="That is not a user!",fg='red')
+                            
+                        while True:
+                            modCheck = DbCursor.fetchone()
+                            if modCheck != None:
+                                modInt = modCheck[0]
+                            else:
+                                break
+                            
+                        if selectedUser != "--Select User--":
+                            try:
+                                if modInt == 2:
+                                    print("User already Admin\n")
+                                    permsInfo.config(text="User already a Moderator!",fg='red')
+                                    
+                                elif modInt == None:
+                                    permsInfo.config(text="That is not a user!",fg='red')
+                                    print("Not a correct username\n")
+                                    
+                                else:
+                                    print("Added user to moderator\n")
+                                    permsInfo.config(text="Added user to Moderator",fg='green')
+                                    DbCursor.execute("UPDATE Permissions SET Permissions = 2 WHERE ID = (?);",[userID]).commit()
+                            except:
+                                print("Not a correct username!\n") 
+                                permsInfo.config(text="That is not a user!",fg='red')
+                        else:
+                            print("That is not a user!\n")
+                            permsInfo.config(text="That is not a user!",fg='red')
+                    
+                    def fmakeAdmin():
+
+                        global permsInfo
+
+                        selectedUser = varOptions.get()
+                        DbCursor.execute("SELECT Usernames, ID FROM Credentials;")
+
+                        while True:
+                            userCheck = DbCursor.fetchone()
+                            if userCheck != None:
+                                if userCheck[0] == selectedUser:
+                                    userID = userCheck[1]
+                            else:
+                                break
+                            
+                        # Fixes error returned when userID = None
+                        try:
+                            DbCursor.execute("SELECT Permissions FROM Permissions WHERE ID = (?);",[userID])
+                        except:
+                            print("User doesn't exist")
+                            permsInfo.config(text="That is not a user!",fg='red')
+                        
                         while True:
                             adminCheck = DbCursor.fetchone()
                             if adminCheck != None:
-                                if adminCheck[0] == selectedUser:
-                                    adminInt = adminCheck[1]
+                                adminInt = adminCheck[0]
                             else:
                                 break
+                            
                         if selectedUser != "--Select User--":
                             try:
                                 if adminInt == 1:
-                                    print("User already Admin")
-                                    try:
-                                        removeWidgets(currentAdmin)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(notUser)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(madeAdmin)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(removeLabel)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(notAdmin)
-                                    except:
-                                        print()
-                                    currentAdmin = Label(permissionWindow,text="User already admin",font=("Helvetica",10),fg='red',bg='black')
-                                    currentAdmin.place(x=120,y=120)
+                                    print("User already Admin\n")
+                                    permsInfo.config(text="User is already an Admin!",fg='red')
+                                    
                                 elif adminInt == None:
-                                    try:
-                                        removeWidgets(currentAdmin)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(notUser)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(madeAdmin)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(removeLabel)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(notAdmin)
-                                    except:
-                                        print()
-                                    notUser = Label(permissionWindow,text="That is not a user!",bg='black',fg='red',font=("Helvetica",10))
-                                    notUser.place(x=120,y=120)
-                                    print("Not a correct username")
+                                    permsInfo.config(text="That is not a user!",fg='red')
+                                    print("Not a correct username\n")
+                                    
                                 else:
-                                    # Have to use StrComp to prevent updating same usernames with differemt capitalisation 
-                                    print("Added user to admin")
-                                    try:
-                                        removeWidgets(currentAdmin)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(notUser)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(madeAdmin)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(removeLabel)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(notAdmin)
-                                    except:
-                                        print()
-                                    madeAdmin = Label(permissionWindow,text="Added user to Admin",font=("Helvetica",10),fg='green',bg='black')
-                                    madeAdmin.place(x=120,y=120)
-                                    DbCursor.execute("UPDATE Credentials SET Admin = 1 WHERE StrComp([Usernames],(?),0) = 0;",[selectedUser]).commit()
+                                    print("Added user to admin\n")
+                                    permsInfo.config(text="Added user to Admin",fg='green')
+                                    DbCursor.execute("UPDATE Permissions SET Permissions = 1 WHERE ID = (?);",[userID]).commit()
                             except:
-                                print("Not a correct username!")
-                                try:
-                                    removeWidgets(currentAdmin)
-                                except:
-                                    print()
-                                try:
-                                    removeWidgets(notUser)
-                                except:
-                                    print()
-                                try:
-                                    removeWidgets(madeAdmin)
-                                except:
-                                    print()
-                                try:
-                                    removeWidgets(removeLabel)
-                                except:
-                                    print()
-                                try:
-                                    removeWidgets(notAdmin)
-                                except:
-                                    print()
-                                notUser = Label(permissionWindow,text="That is not a user!",bg='black',fg='red',font=("Helvetica",10))
-                                notUser.place(x=120,y=120)
-                                print("Not a correct username")
+                                print("Not a correct username!\n")
+                                permsInfo.config(text="That is not a user!",fg='red')
                         else:
-                            print("That is not a user!")
-                            notUser = Label(permissionWindow,text="That is not a user!",bg='black',fg='red',font=("Helvetica",10))
-                            notUser.place(x=120,y=120)
+                            print("That is not a user!\n")
+                            permsInfo.config(text="That is not a user!",fg='red')
 
                     def fremoveAdmin():
-                        global currentAdmin
-                        global notUser
-                        global madeAdmin
-                        global removeLabel
-                        global notAdmin
-                        selectedUser = varOptions.get()
-                        DbCursor.execute("SELECT Usernames, Admin FROM Credentials;")
 
+                        global permsInfo
+
+                        selectedUser = varOptions.get()
+                        DbCursor.execute("SELECT Usernames, ID FROM Credentials;")
+
+                        while True:
+                            userCheck = DbCursor.fetchone()
+                            if userCheck != None:
+                                if userCheck[0] == selectedUser:
+                                    userID = userCheck[1]
+                            else:
+                                break
+
+                        # Fixes error returned when userID = None
+                        try:
+                            DbCursor.execute("SELECT Permissions FROM Permissions WHERE ID = (?);",[userID])
+                        except:
+                            print("User doesn't exist")
+                            permsInfo.config(text="That is not a user!",fg='red')
+                        
                         while True:
                             adminCheck = DbCursor.fetchone()
                             if adminCheck != None:
-                                if adminCheck[0] == selectedUser:
-                                    adminInt = adminCheck[1]
+                                adminInt = adminCheck[0]
                             else:
                                 break
+                            
                         if selectedUser != "--Select User--":
                             try:
                                 if adminInt == 0:
-                                    print("User not an Admin")
-                                    try:
-                                        removeWidgets(currentAdmin)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(notUser)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(madeAdmin)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(removeLabel)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(notAdmin)
-                                    except:
-                                        print()
-                                    notAdmin = Label(permissionWindow,text="User not an admin",font=("Helvetica",10),fg='red',bg='black')
-                                    notAdmin.place(x=120,y=120)
+                                    print("User not an Admin\n")
+                                    permsInfo.config(text="User is not an Admin",fg='red')
+                                    
                                 elif adminInt == None:
-                                    try:
-                                        removeWidgets(currentAdmin)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(notUser)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(madeAdmin)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(removeLabel)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(notAdmin)
-                                    except:
-                                        print()
-                                    notUser = Label(permissionWindow,text="That is not a user!",bg='black',fg='red',font=("Helvetica",10))
-                                    notUser.place(x=120,y=120)
-                                    print("Not a correct username")
+                                    permsInfo.config(text="That is not a user!",fg='red')
+                                    print("Not a correct username\n")
+                                    
                                 else:
-                                    # Have to use StrComp to prevent updating same usernames with differemt capitalisation 
-                                    print("Removed user from Admin")
-                                    try:
-                                        removeWidgets(currentAdmin)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(notUser)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(madeAdmin)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(removeLabel)
-                                    except:
-                                        print()
-                                    try:
-                                        removeWidgets(notAdmin)
-                                    except:
-                                        print()
-                                    removeLabel = Label(permissionWindow,text="Removed user from Admin",font=("Helvetica",10),fg='green',bg='black')
-                                    removeLabel.place(x=100,y=120)
-                                    DbCursor.execute("UPDATE Credentials SET Admin = 0 WHERE StrComp([Usernames],(?),0) = 0;",[selectedUser]).commit()
+                                    print("Removed user from Admin\n")
+                                    permsInfo.config(text="Removed user from Admin",fg='green')
+                                    DbCursor.execute("UPDATE Permissions SET Permissions = 0 WHERE ID = (?);",[userID]).commit()
                             except:
-                                print("Not a correct username")
-                                try:
-                                    removeWidgets(currentAdmin)
-                                except:
-                                    print()
-                                try:
-                                    removeWidgets(notUser)
-                                except:
-                                    print()
-                                try:
-                                    removeWidgets(madeAdmin)
-                                except:
-                                    print()
-                                try:
-                                    removeWidgets(removeLabel)
-                                except:
-                                    print()
-                                try:
-                                    removeWidgets(notAdmin)
-                                except:
-                                    print()
-                                notUser = Label(permissionWindow,text="That is not a user!",bg='black',fg='red',font=("Helvetica",10))
-                                notUser.place(x=120,y=120)
-                                print("Not a correct username")
+                                print("Not a correct username\n")
+                                permsInfo.config(text="That is not a user!",fg='red')
                         else:
-                            print("That is not a user!")
-                            notUser = Label(permissionWindow,text="That is not a user!",bg='black',fg='red',font=("Helvetica",10))
-                            notUser.place(x=120,y=120)
+                            print("That is not a user!\n")
+                            permsInfo.config(text="That is not a user!",fg='red')
 
                     userLabel = Label(permissionWindow,text="USER:",font=("Helvetica",10),bg='black',fg='white')
                     userLabel.place(x=60,y=20)
                     makeAdmin = Button(permissionWindow,text="Make Admin",font=("Helvetica",10),bg='black',fg='white',relief=FLAT,bd=0,command=fmakeAdmin)
-                    makeAdmin.place(x=80,y=80)
+                    makeAdmin.place(x=80,y=50)
                     removeAdmin = Button(permissionWindow,text="Remove Admin",font=("Helvetica",10),bg='black',fg='white',relief=FLAT,bd=0,command=fremoveAdmin)
-                    removeAdmin.place(x=180,y=80)
+                    removeAdmin.place(x=80,y=80)
+                    makeMod = Button(permissionWindow,text="Make Moderator",font=("Helvetica",10),bg='black',fg='white',relief=FLAT,bd=0,command=fmakeMod)
+                    makeMod.place(x=180,y=50)
+                    removeMod = Button(permissionWindow,text="Remove Moderator",font=("Helvetica",10),bg='black',fg='white',relief=FLAT,bd=0,command=fremoveMod)
+                    removeMod.place(x=180,y=80)
 
                 def checkPermsWindow():
                     global permissionWindow
@@ -2529,27 +2497,57 @@ Microsoft Access 2010
                     # Enable the admin actions for certain users
                     DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
                     DbCursor = DbConn.cursor()      
-                    DbCursor.execute("SELECT Usernames, Admin FROM Credentials;")
+                    DbCursor.execute("SELECT Usernames, ID FROM Credentials WHERE Usernames = ?;",[userWhitelist])
+                except:
+                    print("Error fetching database info")
+
+                ## Key part in ensuring program integrity. Without it, program will break and maybe even crash! ##
+
+                userID = None
+                try:
+                    userCheckDB = DbCursor.fetchone()
+                    if userCheckDB != None:
+                        if userCheckDB[0] == userWhitelist:
+                            userID = userCheckDB[1]
+                        else:
+                            print("userCheckDB:",userCheckDB)
+                            print("userCheckDB[0] is NOT userWhitelist!")
+                    else:
+                        print("FatalError: userCheckDB = None!")
+
+                    # Getting permissions for user
+                    DbCursor.execute("SELECT ID, Permissions FROM Permissions WHERE ID = ?;",[userID])
+                    
+                    adminCheckDB = DbCursor.fetchone()
+                    if adminCheckDB != None:
+                        if userID != None:
+                            if adminCheckDB[0] == userID:
+                                adminCheck = adminCheckDB[1]
+                            else:
+                                print("adminCheckDB[0] is not userID!")
+                                
+                        else:
+                            print("FatalError: userID = None!")
+                            
+                    else:
+                        print("FatalError: adminCheckDB = None!")
+                                                
                 except:
                     print("Database doesn't exist error")
-                    adminCheck = 0
+                    removeDatabaseFunc()
 
-                while True:
-                    try:
-                        adminCheckDB = DbCursor.fetchone()
-                    except:
-                        print("Database doesn't exist error")
-                        removeDatabaseFunc()
-                        break
-                    if adminCheckDB != None:
-                        if adminCheckDB[0] == userWhitelist:
-                            adminCheck = adminCheckDB[1]
-                    else:
-                        break
-                    
+                # One last integrity check before continuing...
+                if userID == None:
+                    print("===== FatalError: Integrity check failed! =====")
+                    adminCheck = 0
+                else:
+                    print("===== Integrity check passed! =====\n")
+
                 if adminCheck == 1:
                     resetDatabase.config(state=NORMAL)
                     adminUser.config(state=NORMAL)
+                    tempRemove.config(state=NORMAL)
+                elif adminCheck == 2:
                     tempRemove.config(state=NORMAL)
                 else:
                     adminLabel = Label(master=otherCanvas,text="Admin Only",font=("Helvetica",10),fg='red',bg='#3d3d3d')
