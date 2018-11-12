@@ -54,7 +54,7 @@ def reportProgress(blocknum, blocksize, totalsize):
     percentage = percentage.replace('%','')
     latestPercent = int(percentage)+1
 
-    if latestPercent == 101:
+    if latestPercent >= 101:
         latestPercent = 100
 
     percentageLabelCPU = Label(master=progressWindow,text=("%d" % latestPercent),font=('Helvetica',8,'bold'),bg='black',fg='white')
@@ -90,7 +90,7 @@ def reportProgressGPU(blocknum, blocksize, totalsize):
     percentage = percentage.replace('%','')
     latestPercent = int(percentage)+1
 
-    if latestPercent == 101:
+    if latestPercent >= 101:
         latestPercent = 100
     progressBarGPU['value']=latestPercent
     percentageLabelGPU.config(text=("%d" % latestPercent))
