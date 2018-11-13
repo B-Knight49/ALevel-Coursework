@@ -522,6 +522,115 @@ def __init__():
 
 
 
+##########################
+#  Permissions Function  #
+##########################
+
+
+
+    def getPermissions(adminCheck):
+
+        global userWhitelist
+        global userCheckDB
+        global adminCheckDB
+        global userID
+
+        try:
+            # Enable the admin actions for certain users
+            DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
+            DbCursor = DbConn.cursor()      
+            DbCursor.execute("SELECT Usernames, ID FROM Credentials WHERE Usernames = ?;",[userWhitelist])
+        except:
+            print("Error fetching database info")
+
+        ## Key part in ensuring program integrity. Without it, program will break and maybe even crash! ##
+
+        userID = None
+        try:
+            userCheckDB = DbCursor.fetchone()
+            if userCheckDB != None:
+                if userCheckDB[0] == userWhitelist:
+                    userID = userCheckDB[1]
+                else:
+                    print("userCheckDB:",userCheckDB)
+                    print("userCheckDB[0] is NOT userWhitelist!")
+            else:
+                print("FatalError: userCheckDB = None!")
+
+            # Getting permissions for user
+            DbCursor.execute("SELECT ID, Permissions FROM Permissions WHERE ID = ?;",[userID])
+            
+            adminCheckDB = DbCursor.fetchone()
+            if adminCheckDB != None:
+                if userID != None:
+                    if adminCheckDB[0] == userID:
+                        adminCheck = adminCheckDB[1]
+                    else:
+                        print("adminCheckDB[0] is not userID!")
+                else:
+                    print("FatalError: userID = None!")
+            else:
+                print("FatalError: adminCheckDB = None!")                     
+        except:
+            print("Database doesn't exist error")
+            removeDatabaseFunc()
+
+        # One last integrity check before continuing...
+        if userID == None:
+            print("===== FatalError: Integrity check failed! =====")
+            adminCheck = 0
+        else:
+            print("===== Integrity check passed! =====\n")
+
+        return adminCheck
+
+
+##########################
+#   Feedback Function    #
+##########################
+
+
+    def fPushFeedback():
+
+        global feedbackWindow
+
+        feedbackWindow = tk.Tk()
+        feedbackWindow.geometry('300x500')
+        feedbackWindow.title("Rockstar Games - Feedback Form")
+        feedbackWindow.iconbitmap('Images\\favicon.ico')
+        feedbackWindow.attributes('-topmost', True)
+        feedbackWindow.attributes('-topmost', False)
+        feedbackWindow.config(bg='black')
+        feedbackWindow.resizable(0,0)
+
+        # Center the window
+        def centerWindow(feedbackWindow):
+            feedbackWindow.update_idletasks()
+            w = feedbackWindow.winfo_screenwidth()
+            h = feedbackWindow.winfo_screenheight()
+            size = tuple(int(_) for _ in feedbackWindow.geometry().split('+')[0].split('x'))
+            x = w/2 - size[0]/2
+            y = h/2 - size[1]/2
+            feedbackWindow.geometry("%dx%d+%d+%d" % (size + (x, y)))
+        centerWindow(feedbackWindow)
+
+
+    def checkFeedbackWindow():
+
+        print("Checking feedback form...")
+        try:
+            isOpened = feedbackWindow.winfo_exists()
+            if isOpened == 1:
+                print("Feedback form already open")
+                return
+            else:
+                print("Returned 0 - Continuing...")
+                fPushFeedback()
+        except:
+            print("Continuing...")
+            fPushFeedback()
+        
+
 ##########################################
 ##########################################
 ##                                      ##
@@ -804,6 +913,13 @@ def __init__():
         userLoggedIn = Menubutton(master=pw,text=currentUser,font=('Helvetica',7,'bold','underline'),bg='black',fg='white',relief=FLAT,bd=0,activebackground='#e5e5e5')
         userLoggedMENU = Menu(userLoggedIn,tearoff=0,bg='black',fg='#A9A9A9',activeforeground='white',activebackground='black',relief=SUNKEN)
         userLoggedMENU.add_command(label="SIGN OUT",font=('Helvetica',9,'bold'),command=fSignOUT)
+
+        # Check the user's permission level
+        adminCheck = 0
+        adminCheck = getPermissions(adminCheck)
+        
+        if adminCheck == 2:
+            userLoggedMENU.add_command(label="FEEDBACK (MODERATOR)",font=('Helvetica',9,'bold'),command=checkFeedbackWindow)
 
         # Bind both left-click and right-click to the menu
         # Make sure the context menu only appears when clicking the button
@@ -2493,56 +2609,10 @@ Microsoft Access 2010
                 adminUser.config(state=DISABLED)
                 tempRemove.config(state=DISABLED)
 
-                try:
-                    # Enable the admin actions for certain users
-                    DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
-                    DbCursor = DbConn.cursor()      
-                    DbCursor.execute("SELECT Usernames, ID FROM Credentials WHERE Usernames = ?;",[userWhitelist])
-                except:
-                    print("Error fetching database info")
-
-                ## Key part in ensuring program integrity. Without it, program will break and maybe even crash! ##
-
-                userID = None
-                try:
-                    userCheckDB = DbCursor.fetchone()
-                    if userCheckDB != None:
-                        if userCheckDB[0] == userWhitelist:
-                            userID = userCheckDB[1]
-                        else:
-                            print("userCheckDB:",userCheckDB)
-                            print("userCheckDB[0] is NOT userWhitelist!")
-                    else:
-                        print("FatalError: userCheckDB = None!")
-
-                    # Getting permissions for user
-                    DbCursor.execute("SELECT ID, Permissions FROM Permissions WHERE ID = ?;",[userID])
-                    
-                    adminCheckDB = DbCursor.fetchone()
-                    if adminCheckDB != None:
-                        if userID != None:
-                            if adminCheckDB[0] == userID:
-                                adminCheck = adminCheckDB[1]
-                            else:
-                                print("adminCheckDB[0] is not userID!")
-                                
-                        else:
-                            print("FatalError: userID = None!")
-                            
-                    else:
-                        print("FatalError: adminCheckDB = None!")
-                                                
-                except:
-                    print("Database doesn't exist error")
-                    removeDatabaseFunc()
-
-                # One last integrity check before continuing...
-                if userID == None:
-                    print("===== FatalError: Integrity check failed! =====")
-                    adminCheck = 0
-                else:
-                    print("===== Integrity check passed! =====\n")
-
+                # Get the user's permissions 
+                adminCheck = 0
+                adminCheck = getPermissions(adminCheck)
+                
                 if adminCheck == 1:
                     resetDatabase.config(state=NORMAL)
                     adminUser.config(state=NORMAL)
