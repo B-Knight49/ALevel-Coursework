@@ -5,6 +5,7 @@
 import tkinter as tk
 from tkinter import *
 from tkinter import ttk
+from tkinter.scrolledtext import ScrolledText
 
 # Import OS and SYS to access system information #
 import os
@@ -70,7 +71,9 @@ def __init__():
             DbCursor.execute('CREATE TABLE Hardware (ID INTEGER NOT NULL CONSTRAINT FK_ID REFERENCES Credentials (ID), CPU CHAR(128), GPU CHAR(128), RAM INTEGER, HDD INTEGER);').commit()
             print("Created Table Hardware\n")
             DbCursor.execute('CREATE TABLE Permissions (ID INTEGER NOT NULL CONSTRAINT Perms_ID REFERENCES Credentials (ID), Permissions INTEGER);').commit()
-            print("Created Table Hardware\n")
+            print("Created Table Permissions\n")
+            DbCursor.execute('CREATE TABLE Feedback (ID INTEGER NOT NULL CONSTRAINT Feed_ID REFERENCES Credentials (ID), Comment LONGTEXT);').commit()
+            print("Created Table Feedback")
         except:
             raise
     
@@ -593,6 +596,7 @@ def __init__():
     def fPushFeedback():
 
         global feedbackWindow
+        global userWhitelist
 
         feedbackWindow = tk.Tk()
         feedbackWindow.geometry('300x500')
@@ -614,10 +618,67 @@ def __init__():
             feedbackWindow.geometry("%dx%d+%d+%d" % (size + (x, y)))
         centerWindow(feedbackWindow)
 
+        def submitInfo():
+
+            # Check that feedback isn't empty
+            # ScrolledText requires two additional arguments
+            commentText = feedbackBox.get(1.0,END)
+            if len(commentText) == 1:
+                print("Feedback box is empty!")
+                feedbackInfoLabel.config(text="Feedback box is empty!",fg='red')
+                return
+            modName = modNameBox.get()
+
+            # Add the Moderator's name to the end of the comment
+            commentText = commentText + " - " + modName
+
+            # Get the Moderator's ID
+            DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
+            DbCursor = DbConn.cursor()
+            DbCursor.execute("SELECT Usernames, ID FROM Credentials WHERE Usernames = ?;",[userWhitelist])
+
+            userID = None
+            userCheckDB = DbCursor.fetchone()
+            if userCheckDB != None:
+                if userCheckDB[0] == userWhitelist:
+                    userID = userCheckDB[1]
+                else:
+                    print("userCheckDB:",userCheckDB)
+                    print("userCheckDB[0] is NOT userWhitelist!")
+            else:
+                print("FatalError: userCheckDB = None!")
+                print(userCheckDB)
+
+            if userID != None:
+                # Insert data into table
+                DbCursor.execute('INSERT INTO Feedback (ID, Comment) values (?,?);',[userID, commentText]).commit()
+                print("Inserted into Feedback table!")
+                feedbackInfoLabel.config(text="Feedback inserted into table!",fg='green')
+                
+        
+        feedbackInfoLabel = Label(feedbackWindow,font=('Helvetica',10),bg='black',fg='green')            
+        feedbackInfoLabel.place(x=70,y=325)
+        
+        feedbackLabel = Label(feedbackWindow, text="Feedback:",font=('Helvetica',11),bg='black',fg='white')
+        feedbackLabel.place(x=35,y=35)
+        feedbackMod = Label(feedbackWindow, text="Moderator Name:",font=('Helvetica',11),bg='black',fg='white')
+        feedbackMod.place(x=35,y=350)
+
+        feedbackBox = ScrolledText(feedbackWindow, width=25, height=15)
+        feedbackBox.place(x=40,y=65)
+        modNameBox = Entry(feedbackWindow,bd=0,width=35)
+        modNameBox.place(x=40,y=380)
+
+        backgroundRectangle = PhotoImage(master=feedbackWindow,file='Images\\roundedRectangle.ppm')
+        backgroundRectangle.image = backgroundRectangle
+        submitButton = Button(feedbackWindow,text="SUBMIT",font=('Helvetica',9,'bold'),bg='black',image=backgroundRectangle,activebackground='black',relief=FLAT,compound=CENTER,command=submitInfo)
+        submitButton.place(x=100,y=425)
+
+        # Delete everything in the textbox so we can check if it's empty
+        feedbackBox.delete('1.0',END)
 
     def checkFeedbackWindow():
 
-        print("Checking feedback form...")
         try:
             isOpened = feedbackWindow.winfo_exists()
             if isOpened == 1:
