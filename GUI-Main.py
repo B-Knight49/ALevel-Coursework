@@ -72,7 +72,7 @@ def __init__():
             print("Created Table Hardware\n")
             DbCursor.execute('CREATE TABLE Permissions (ID INTEGER NOT NULL CONSTRAINT Perms_ID REFERENCES Credentials (ID), Permissions INTEGER);').commit()
             print("Created Table Permissions\n")
-            DbCursor.execute('CREATE TABLE Feedback (ID INTEGER NOT NULL CONSTRAINT Feed_ID REFERENCES Credentials (ID), Comment LONGTEXT);').commit()
+            DbCursor.execute('CREATE TABLE Feedback (ID INTEGER NOT NULL CONSTRAINT Feed_ID REFERENCES Credentials (ID), cID INTEGER, Comment LONGTEXT);').commit()
             print("Created Table Feedback")
         except:
             raise
@@ -635,8 +635,23 @@ def __init__():
             # Get the Moderator's ID
             DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
             DbCursor = DbConn.cursor()
-            DbCursor.execute("SELECT Usernames, ID FROM Credentials WHERE Usernames = ?;",[userWhitelist])
 
+            # Assign an ID to the comment
+            DbCursor.execute("SELECT ID FROM Credentials;")
+            lastID = 0
+            
+            while True:
+                row = DbCursor.fetchone()
+                if row:
+                    lastID = row[0]
+                else:
+                    nextID = lastID + 1
+                    print("Next available comment ID:",nextID)
+                    break
+
+            # Retrieve the ID of the currently signed-in user (the moderator)
+            DbCursor.execute("SELECT Usernames, ID FROM Credentials WHERE Usernames = ?;",[userWhitelist])
+            
             userID = None
             userCheckDB = DbCursor.fetchone()
             if userCheckDB != None:
@@ -649,9 +664,9 @@ def __init__():
                 print("FatalError: userCheckDB = None!")
                 print(userCheckDB)
 
+            # Insert data into table
             if userID != None:
-                # Insert data into table
-                DbCursor.execute('INSERT INTO Feedback (ID, Comment) values (?,?);',[userID, commentText]).commit()
+                DbCursor.execute('INSERT INTO Feedback (ID,cID,Comment) values (?,?,?);',[userID, nextID, commentText]).commit()
                 print("Inserted into Feedback table!")
                 feedbackInfoLabel.config(text="Feedback inserted into table!",fg='green')
                 
@@ -979,7 +994,7 @@ def __init__():
         adminCheck = 0
         adminCheck = getPermissions(adminCheck)
         
-        if adminCheck == 2:
+        if adminCheck == 2 or adminCheck == 1:
             userLoggedMENU.add_command(label="FEEDBACK (MODERATOR)",font=('Helvetica',9,'bold'),command=checkFeedbackWindow)
 
         # Bind both left-click and right-click to the menu
