@@ -66,14 +66,18 @@ def __init__():
             print("Configuring Tables...")
             DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
             DbCursor = DbConn.cursor()
+            print()
             DbCursor.execute('CREATE TABLE Credentials (ID INTEGER PRIMARY KEY, Usernames CHAR(32), Hash CHAR(64), Code INTEGER);').commit()
-            print("Created Table Credentials\n")
+            print("Created Table Credentials")
             DbCursor.execute('CREATE TABLE Hardware (ID INTEGER NOT NULL CONSTRAINT FK_ID REFERENCES Credentials (ID), CPU CHAR(128), GPU CHAR(128), RAM INTEGER, HDD INTEGER);').commit()
-            print("Created Table Hardware\n")
+            print("Created Table Hardware")
             DbCursor.execute('CREATE TABLE Permissions (ID INTEGER NOT NULL CONSTRAINT Perms_ID REFERENCES Credentials (ID), Permissions INTEGER);').commit()
-            print("Created Table Permissions\n")
-            DbCursor.execute('CREATE TABLE Feedback (ID INTEGER NOT NULL CONSTRAINT Feed_ID REFERENCES Credentials (ID), cID INTEGER, Comment LONGTEXT);').commit()
+            print("Created Table Permissions")
+            DbCursor.execute('CREATE TABLE Feedback (ID INTEGER NOT NULL CONSTRAINT Feed_ID REFERENCES Credentials (ID), cID INTEGER PRIMARY KEY, Comment LONGTEXT);').commit()
             print("Created Table Feedback")
+            DbCursor.execute('CREATE TABLE Responses (ID INTEGER NOT NULL CONSTRAINT Resp_ID REFERENCES Credentials (ID), cID INTEGER NOT NULL CONSTRAINT Resp_cID REFERENCES Feedback (cID), Response LONGTEXT);').commit()
+            print("Created Table Responses")
+            print("\nDone! Continuing...\n")
         except:
             raise
     
@@ -628,7 +632,11 @@ def __init__():
                 feedbackInfoLabel.config(text="Feedback box is empty!",fg='red')
                 return
             modName = modNameBox.get()
-
+            if len(modName) == 0:
+                print("Mod name box is empty!")
+                feedbackInfoLabel.config(text="Please enter your name!",fg='red')
+                return
+            
             # Add the Moderator's name to the end of the comment
             commentText = commentText + " - " + modName
 
@@ -637,7 +645,7 @@ def __init__():
             DbCursor = DbConn.cursor()
 
             # Assign an ID to the comment
-            DbCursor.execute("SELECT ID FROM Credentials;")
+            DbCursor.execute("SELECT cID FROM Feedback;")
             lastID = 0
             
             while True:
@@ -705,6 +713,180 @@ def __init__():
         except:
             print("Continuing...")
             fPushFeedback()
+
+
+##########################
+#   Response Function    #
+##########################
+
+
+    def fRespond():
+
+        global responseWindow
+        global userWhitelist
+
+        responseWindow = tk.Tk()
+        responseWindow.geometry('300x500')
+        responseWindow.title("Rockstar Games - Response Form")
+        responseWindow.iconbitmap('Images\\favicon.ico')
+        responseWindow.attributes('-topmost', True)
+        responseWindow.attributes('-topmost', False)
+        responseWindow.config(bg='black')
+        responseWindow.resizable(0,0)
+
+        # Center the window
+        def centerWindow(responseWindow):
+            responseWindow.update_idletasks()
+            w = responseWindow.winfo_screenwidth()
+            h = responseWindow.winfo_screenheight()
+            size = tuple(int(_) for _ in responseWindow.geometry().split('+')[0].split('x'))
+            x = w/2 - size[0]/2
+            y = h/2 - size[1]/2
+            responseWindow.geometry("%dx%d+%d+%d" % (size + (x, y)))
+        centerWindow(responseWindow)
+
+        def responseSubmit():
+
+            # Change commentSelected to an integer
+            commentID = int(commentSelected)
+
+            # Check that feedback isn't empty
+            # ScrolledText requires two additional arguments
+            responseText = responseBox.get(1.0,END)
+            if len(responseText) == 1:
+                print("Feedback box is empty!")
+                responseInfoLabel.config(text="Response box is empty!",fg='red')
+                return
+            elif responseText == "Please type here...\n":
+                print("Please remove the preview text!")
+                responseInfoLabel.config(text="Please remove preview text!",fg='red')
+                return
+
+            else:
+                # Retrieve the ID of the currently signed-in user (the moderator)
+                DbCursor.execute("SELECT Usernames, ID FROM Credentials WHERE Usernames = ?;",[userWhitelist])
+                
+                userID = None
+                userCheckDB = DbCursor.fetchone()
+                if userCheckDB != None:
+                    if userCheckDB[0] == userWhitelist:
+                        userID = userCheckDB[1]
+                else:
+                    print("FatalError: userCheckDB = None!")
+
+                # Insert response into the table
+                if userID != None:
+                    DbCursor.execute('INSERT INTO Responses (ID,cID,Response) values (?,?,?);',[userID, commentID, responseText]).commit()
+                    print("Inserted into Feedback table!")
+                    responseInfoLabel.config(text="Response submitted!",fg='green')                
+        
+        responseInfoLabel = Label(responseWindow,font=('Helvetica',10),bg='black',fg='green')            
+        responseInfoLabel.place(x=70,y=425)
+        
+        responseLabel = Label(responseWindow, text="Response:",font=('Helvetica',11),bg='black',fg='white')
+        responseLabel.place(x=35,y=95)
+        responseListLabel = Label(responseWindow, text="Comment ID:",font=('Helvetica',11),bg='black',fg='white')
+        responseListLabel.place(x=35,y=40)
+
+        commentBox = ScrolledText(responseWindow, width=25, height=8)
+        commentBox.place(x=40,y=130)
+        commentBox.config(state=DISABLED)
+        responseBox = ScrolledText(responseWindow, width=25, height=8)
+        responseBox.place(x=40,y=280)
+        
+        DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
+        DbCursor = DbConn.cursor()
+        DbCursor.execute("SELECT cID, Comment FROM Feedback;")
+        
+        listBoxID = 0
+        allComments = []
+        while True:
+            itemDB = DbCursor.fetchone()
+            if itemDB != None:
+                listBoxID += 1
+                programmerName = itemDB[1]
+                locName = programmerName.index("-")
+                programmerName = programmerName[locName:]
+                commentID = str(itemDB[0])
+                titleDisplay = commentID + programmerName
+                allComments.append(titleDisplay)
+            elif listBoxID == 100:
+                print("100 comments reached! Breaking loop to stop hanging!")
+                break
+            else:
+                break
+        
+        resOptions = StringVar()
+        responseList = ttk.Combobox(responseWindow,textvariable=resOptions,width=33,height=50)
+        responseList['values'] = (allComments)
+        responseList.set('--Select Comment--')
+        responseList.place(x=40,y=65)
+        responseWindow.withdraw()
+        responseWindow.deiconify()
+
+        def getComment(event):
+            
+            # Global commentSelected as we can use the ID later in 
+            global commentSelected
+            
+            print("Changed comment ID")
+
+            # Get the selected commentID from the drop-down box
+            commentSelected = responseList.get()
+            commentSelected = commentSelected[:1]
+
+            # Connect to the database
+            DbConn = pyDb.win_connect_mdb("Database\\UsrDet.accdb")
+            DbCursor = DbConn.cursor()
+            DbCursor.execute("SELECT cID, ID, Comment FROM Feedback;")
+
+            # Make sure that commentSelected isn't None before continuing
+            if commentSelected != "-" or commentSelected != None:
+
+                # Get the comment's body
+                commentBody = None
+                while True:
+                    commentDB = DbCursor.fetchone()
+                    if commentDB != None:
+                        if commentDB[0] == int(commentSelected):
+                            # commentDB[2] because 0 is CID, 1 is ID and 2 is the comment itself
+                            commentBody = commentDB[2]
+                            break
+                        else:
+                            print("commentDB[0]",commentDB[0],"is not equal to",commentSelected)
+                    else:
+                        break
+                # Time to insert the comment into the text box
+                commentBox.config(state=NORMAL)
+                commentBox.delete('1.0',END)
+                commentBox.insert(INSERT, commentBody)
+                commentBox.config(state=DISABLED)
+
+        # Bind the selection of an item to getComment
+        responseList.bind('<<ComboboxSelected>>', getComment)
+        
+        backgroundRectangle = PhotoImage(master=responseWindow,file='Images\\roundedRectangle.ppm')
+        backgroundRectangle.image = backgroundRectangle
+        submitButton = Button(responseWindow,text="SUBMIT",font=('Helvetica',9,'bold'),bg='black',image=backgroundRectangle,activebackground='black',relief=FLAT,compound=CENTER,command=responseSubmit)
+        submitButton.place(x=100,y=450)
+
+        # Delete everything in the textbox so we can check if it's empty
+        responseBox.delete('1.0',END)
+        responseBox.insert(INSERT,"Please type here...")
+
+    def checkResponseWindow():
+
+        try:
+            isOpened = responseWindow.winfo_exists()
+            if isOpened == 1:
+                print("Feedback form already open")
+                return
+            else:
+                print("Returned 0 - Continuing...")
+                fRespond()
+        except:
+            print("Continuing...")
+            fRespond()
         
 
 ##########################################
@@ -996,6 +1178,8 @@ def __init__():
         
         if adminCheck == 2 or adminCheck == 1:
             userLoggedMENU.add_command(label="FEEDBACK (MODERATOR)",font=('Helvetica',9,'bold'),command=checkFeedbackWindow)
+        if adminCheck == 3 or adminCheck == 1:
+            userLoggedMENU.add_command(label="RESPONSE (PROGRAMMER)",font=('Helvetica',9,'bold'),command=checkResponseWindow)
 
         # Bind both left-click and right-click to the menu
         # Make sure the context menu only appears when clicking the button
