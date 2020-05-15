@@ -1,0 +1,12 @@
+ 
+- Pseudocode
+- Adoption / Laggards / Majority, Minority
+
+
+- Development (screenshots and explanations need finishing)
+
+- Look at issues on Github and include them in write-up
+- Find missing issue versions 
+
+- Note what each build changed / has different
+
